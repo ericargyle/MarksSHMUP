@@ -4,12 +4,5 @@ body{background:linear-gradient(#08111f,#030712)}
 #game{display:block;width:100vw;height:100vh;touch-action:none}
 #hud{position:fixed;left:12px;top:10px;z-index:5;text-shadow:0 2px 0 #000;font-weight:800;pointer-events:none}
 #status{font-size:.95rem;color:#c8d2ff;margin-top:2px} #stats{font-size:.9rem;color:#ffe08a;margin-top:2px}
-#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.56);z-index:10}
-#overlay.hidden{display:none}
-.panel{width:min(92vw,420px);background:#111936;border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:20px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.4)}
-.panel h1{margin:0 0 10px;font-size:2rem}
-.panel p{margin:0 0 16px;color:#cbd5ff}
-.panel button,#touchUI button{border:none;border-radius:18px;padding:14px 16px;background:linear-gradient(180deg,#ff7a59,#ff3d76);color:#fff;font:inherit;font-weight:900;box-shadow:0 8px 20px rgba(0,0,0,.25)}
-#touchUI{position:fixed;left:0;right:0;bottom:12px;display:flex;justify-content:space-between;gap:10px;padding:0 12px;z-index:6}
-#touchUI button{flex:1;min-width:0;opacity:.92}
-@media (min-width:768px){#touchUI{max-width:520px;left:50%;transform:translateX(-50%);bottom:18px}}
+#controls{position:fixed;right:12px;bottom:12px;display:flex;gap:10px;z-index:6}
+#controls button{border:none;border-radius:18px;padding:14px 18px;background:linear-gradient(180deg,#ff7a59,#ff3d76);color:#fff;font:inherit;font-weight:900;box-shadow:0 8px 20px rgba(0,0,0,.25)}

@@ -1,372 +1,215 @@
 const c = document.getElementById('game');
 const x = c.getContext('2d');
-const overlay = document.getElementById('overlay');
-const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
 const statsEl = document.getElementById('stats');
-const leftBtn = document.getElementById('leftBtn');
-const rightBtn = document.getElementById('rightBtn');
-const fireBtn = document.getElementById('fireBtn');
 const bombBtn = document.getElementById('bombBtn');
+const laserBtn = document.getElementById('laserBtn');
 
-const W = { w: 0, h: 0, dpr: 1 };
-const keys = {};
-let running = false;
-let last = 0;
-let scene = 'grass';
-let levelIndex = 0;
-let score = 0;
-let lives = 3;
-let bombs = 3;
-let shake = 0;
-let flash = 0;
-let bossHitFlash = 0;
-let bgX = 0;
-let fireCooldown = 0;
-let spawnTimer = 0;
-let levelTimer = 0;
-let particles = [];
-let bullets = [];
-let enemyBullets = [];
-let enemies = [];
-let powerups = [];
-let mountains = [];
-let terrain = [];
-let player = { x: 90, y: 0, w: 26, h: 18, speed: 300, fireRate: 0.14, inv: 0 };
-let boss = null;
+const d = { w: 0, h: 0, s: 1 };
+let running = true, last = 0, score = 0, bombs = 3, level = 1;
+let player = { x: 120, y: 260, w: 34, h: 22, vx: 0, vy: 0, dragging: false, dragDX: 0, dragDY: 0, inv: 0 };
+let bullets = [], eBullets = [], enemies = [], particles = [], boss = null, terrain = [];
+let laserHeat = 0, spawnTimer = 0, terrainScroll = 0, bossTimer = 0;
+let keys = {};
 
-const levelDefs = [
-  { name: 'Grass Run', bg: ['#69c34c', '#8ee265'], enemyRate: 1.0, speed: 130, bossHp: 24 },
-  { name: 'Snow Rush', bg: ['#d7f3ff', '#89b8d3'], enemyRate: 1.15, speed: 160, bossHp: 30 },
-  { name: 'Volcano Edge', bg: ['#ffb25c', '#7d2c2c'], enemyRate: 1.35, speed: 190, bossHp: 38 },
-];
+function resize(){ d.s = Math.min(devicePixelRatio || 1, 2); d.w = c.width = Math.floor(innerWidth * d.s); d.h = c.height = Math.floor(innerHeight * d.s); c.style.width='100vw'; c.style.height='100vh'; }
+function sx(v){ return v * d.s; }
+function sy(v){ return v * d.s; }
+function rect(x0,y0,w,h,c0){ x.fillStyle=c0; x.fillRect(x0,y0,w,h); }
+function circle(x0,y0,r,c0){ x.fillStyle=c0; x.beginPath(); x.arc(x0,y0,r,0,Math.PI*2); x.fill(); }
+function line(x1,y1,x2,y2,c0,w=3){ x.strokeStyle=c0; x.lineWidth=w; x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2); x.stroke(); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function rand(a,b){ return Math.random()*(b-a)+a; }
+function hit(a,b){ return a.x<a.w+b.x && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+function boxOverlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
 
-function rand(a, b) { return Math.random() * (b - a) + a; }
-function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-function resize() {
-  W.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  W.w = c.width = Math.floor(innerWidth * W.dpr);
-  W.h = c.height = Math.floor(innerHeight * W.dpr);
-  c.style.width = '100vw';
-  c.style.height = '100vh';
-}
-function sx(v) { return v * W.dpr; }
-function sy(v) { return v * W.dpr; }
-function rect(x0, y0, w, h, color) { x.fillStyle = color; x.fillRect(x0, y0, w, h); }
-function circle(x0, y0, r, color) { x.fillStyle = color; x.beginPath(); x.arc(x0, y0, r, 0, Math.PI * 2); x.fill(); }
-function line(x1, y1, x2, y2, color, width = 3) { x.strokeStyle = color; x.lineWidth = width; x.beginPath(); x.moveTo(x1, y1); x.lineTo(x2, y2); x.stroke(); }
-
-function buildTerrain() {
-  mountains = [];
+function buildTerrain(){
   terrain = [];
-  for (let i = 0; i < 8; i++) mountains.push({ x: rand(0, 900), y: rand(40, 220), w: rand(120, 240), h: rand(50, 130), s: rand(0.2, 0.7) });
-  for (let i = 0; i < 120; i++) terrain.push({ x: rand(0, 2000), y: rand(0, 1), kind: Math.random() > 0.8 ? 'tree' : 'rock', s: rand(0.7, 1.2) });
+  for(let i=0;i<35;i++) terrain.push({ x: rand(0,2200), y: rand(0.1,0.9), kind: i%7===0 ? 'rock':'tree', s: rand(0.6,1.35) });
 }
-function resetLevel(idx) {
-  levelIndex = idx;
-  const L = levelDefs[levelIndex];
-  scene = levelIndex === 1 ? 'snow' : levelIndex === 2 ? 'lava' : 'grass';
-  bullets = []; enemyBullets = []; enemies = []; powerups = [];
-  boss = null;
-  player.x = 90 * W.dpr;
-  player.y = W.h * 0.72;
-  player.inv = 1.2;
-  fireCooldown = 0;
-  spawnTimer = 0.7;
-  levelTimer = 0;
-  bgX = 0;
-  shake = 0;
-  flash = 0;
-  bossHitFlash = 0;
-  statusEl.textContent = `${L.name} ready`;
-  statsEl.textContent = `Score ${score} · Bombs ${bombs} · Level ${levelIndex + 1}`;
+function reset(){
+  bullets=[]; eBullets=[]; enemies=[]; particles=[]; boss=null; laserHeat=0; spawnTimer=0.6; bossTimer=0; terrainScroll=0; score=0; bombs=3; level=1;
+  player = { x: 110*d.s, y: d.h*0.55, w: 34*d.s, h: 22*d.s, vx: 0, vy: 0, dragging: false, dragDX: 0, dragDY: 0, inv: 1.0 };
+  for(let i=0;i<9;i++) enemies.push(makeEnemy(true));
+  statusEl.textContent = 'Touch ship and drag. Use BOMB / LASER.';
+  updateHud();
 }
-function addParticle(x0, y0, color) {
-  for (let i = 0; i < 10; i++) particles.push({ x: x0, y: y0, vx: rand(-120, 120), vy: rand(-120, 120), life: rand(0.25, 0.55), color });
+function updateHud(){ statsEl.textContent = `Score ${Math.floor(score)} · Bombs ${bombs} · Level ${level}`; }
+function makeEnemy(offscreen=false){
+  const y = rand(d.h*0.14, d.h*0.84);
+  const kind = Math.random() < 0.5 ? 'drone' : (Math.random() < 0.8 ? 'swoop' : 'turret');
+  return { kind, x: offscreen ? d.w + rand(0,500) : d.w + 60, y, w: 28*d.s, h: 18*d.s, hp: kind==='turret' ? 3 : 1, vx: rand(-120,-220)*d.s, vy: kind==='swoop' ? rand(-50,50)*d.s : 0, fire: rand(0.5,2.0) };
 }
-function shoot(fromPlayer = true) {
-  if (fromPlayer) {
-    if (fireCooldown > 0) return;
-    bullets.push({ x: player.x + 14 * W.dpr, y: player.y - 2 * W.dpr, vx: 520 * W.dpr, vy: 0, r: 4 * W.dpr, dmg: 1 });
-    fireCooldown = player.fireRate;
-  }
+function spawnBoss(){
+  boss = { x: d.w + 180, y: d.h*0.24, w: 160*d.s, h: 90*d.s, hp: 40 + (level-1)*10, maxHp: 40 + (level-1)*10, vx: -60*d.s, fire: 0.7 };
+  statusEl.textContent = 'Boss approaching!';
 }
-function bomb() {
+function puff(x0,y0,c0){ for(let i=0;i<12;i++) particles.push({x:x0,y:y0,vx:rand(-180,180)*d.s,vy:rand(-180,180)*d.s,life:rand(0.18,0.45),c:c0}); }
+function fireLaser(){
+  if (laserHeat > 0) return;
+  bullets.push({ x: player.x + player.w, y: player.y + player.h/2, w: 24*d.s, h: 4*d.s, vx: 720*d.s, dmg: 1, laser: true });
+  laserHeat = 0.12;
+}
+function bomb(){
   if (bombs <= 0) return;
   bombs--;
-  flash = 0.35;
-  shake = 18;
-  enemies.forEach(e => { e.hp = 0; score += 10; addParticle(e.x, e.y, '#fff3b0'); });
-  if (boss) boss.hp -= 6;
-  enemyBullets = [];
-  statsEl.textContent = `Score ${score} · Bombs ${bombs} · Level ${levelIndex + 1}`;
+  enemies.forEach(e => { e.hp = 0; score += 25; puff(e.x,e.y,'#fff0a6'); });
+  if (boss) boss.hp -= 8;
+  eBullets = [];
+  puff(player.x, player.y, '#ffffff');
+  updateHud();
 }
-function spawnEnemy() {
-  const L = levelDefs[levelIndex];
-  const y = rand(W.h * 0.1, W.h * 0.68);
-  const type = Math.random();
-  if (type < 0.62) enemies.push({ kind: 'drone', x: W.w + 40, y, w: 26 * W.dpr, h: 18 * W.dpr, hp: 1, vx: -(L.speed + rand(20, 80)) * W.dpr, vy: rand(-15, 15) * W.dpr, shoot: rand(0.9, 2.2) });
-  else if (type < 0.88) enemies.push({ kind: 'turret', x: W.w + 40, y, w: 30 * W.dpr, h: 24 * W.dpr, hp: 2, vx: -(L.speed * 0.65) * W.dpr, vy: 0, shoot: rand(0.7, 1.4) });
-  else enemies.push({ kind: 'charger', x: W.w + 40, y, w: 34 * W.dpr, h: 22 * W.dpr, hp: 2, vx: -(L.speed * 1.3) * W.dpr, vy: rand(-24, 24) * W.dpr, shoot: rand(1.4, 2.4) });
-}
-function spawnBoss() {
-  boss = { x: W.w + 180, y: W.h * 0.25, w: 150 * W.dpr, h: 86 * W.dpr, hp: levelDefs[levelIndex].bossHp, maxHp: levelDefs[levelIndex].bossHp, vx: -90 * W.dpr, phase: 0, fire: 0.6 };
-  statusEl.textContent = 'Boss incoming';
-}
-function hitPlayer() {
-  if (player.inv > 0) return;
-  lives--;
-  player.inv = 1.3;
-  shake = 20;
-  addParticle(player.x, player.y, '#ffffff');
-  if (lives <= 0) {
-    running = false;
-    overlay.classList.remove('hidden');
-    overlay.querySelector('h1').textContent = 'Game Over';
-    overlay.querySelector('p').textContent = `Final score ${score}. Tap start to try again.`;
-    startBtn.textContent = 'Restart';
-  }
-}
-function rectHit(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
-function drawBackground(dt) {
-  const L = levelDefs[levelIndex];
-  bgX -= 140 * W.dpr * dt;
-  if (bgX < -W.w) bgX += W.w;
-  rect(0, 0, W.w, W.h, L.bg[0]);
-  const grad = x.createLinearGradient(0, 0, 0, W.h);
-  grad.addColorStop(0, L.bg[0]);
-  grad.addColorStop(1, L.bg[1]);
-  x.fillStyle = grad;
-  x.fillRect(0, 0, W.w, W.h);
+function pointInPlayer(mx,my){ return mx > player.x-10*d.s && mx < player.x+player.w+12*d.s && my > player.y-12*d.s && my < player.y+player.h+12*d.s; }
+
+function drawBackground(dt){
+  terrainScroll += 110*d.s*dt;
+  const sky = x.createLinearGradient(0,0,0,d.h);
+  sky.addColorStop(0,'#17335a');
+  sky.addColorStop(1,'#08111f');
+  x.fillStyle = sky; x.fillRect(0,0,d.w,d.h);
+  rect(0,d.h*0.78,d.w,d.h*0.22, level===2 ? '#35457a' : level===3 ? '#4b241c' : '#1f5b2f');
 
   x.save();
-  x.translate(bgX, 0);
-  mountains.forEach(m => {
-    x.fillStyle = levelIndex === 1 ? '#edf9ff' : levelIndex === 2 ? '#7f2d2d' : '#356d2a';
+  x.translate(-terrainScroll % sx(220), 0);
+  for(let i=0;i<18;i++){
+    const mx = sx(i*220 + 120);
+    const base = d.h*0.78;
+    x.fillStyle = level===2 ? '#e8f5ff' : level===3 ? '#9d3927' : '#3a7b41';
     x.beginPath();
-    x.moveTo(sx(m.x), sy(m.y + m.h));
-    x.lineTo(sx(m.x + m.w / 2), sy(m.y));
-    x.lineTo(sx(m.x + m.w), sy(m.y + m.h));
+    x.moveTo(mx, base);
+    x.lineTo(mx+sx(70), base - sx(50 + (i%3)*25));
+    x.lineTo(mx+sx(140), base);
     x.closePath();
     x.fill();
-  });
-  for (let i = 0; i < 20; i++) {
-    const px = ((i * 180) + (bgX * 0.4)) % (W.w + 220) - 100;
-    const py = sy(440 + (i % 3) * 16);
-    rect(px, py, sx(96), sy(120), levelIndex === 1 ? '#dff6ff' : levelIndex === 2 ? '#ac5a2f' : '#4a8f31');
   }
   x.restore();
 
   terrain.forEach(t => {
-    const xPos = ((t.x * 0.35) - bgX * 0.18) % (W.w + 120) - 60;
+    const px = ((t.x*0.65 - terrainScroll*0.25) % (d.w + sx(120))) - sx(60);
     if (t.kind === 'tree') {
-      rect(xPos, sy(470), sx(10 * t.s), sy(24 * t.s), '#62431d');
-      circle(xPos + sx(5 * t.s), sy(462), sx(14 * t.s), levelIndex === 1 ? '#ffffff' : levelIndex === 2 ? '#f76b3c' : '#2c8b2f');
+      rect(px, d.h*0.75, sx(10*t.s), sx(22*t.s), '#5b3a1d');
+      circle(px+sx(5*t.s), d.h*0.74, sx(12*t.s), level===2 ? '#f2fbff' : level===3 ? '#ff7035' : '#2e8d3d');
     } else {
-      circle(xPos, sy(490), sx(4 * t.s), levelIndex === 1 ? '#d7e7f0' : levelIndex === 2 ? '#913c23' : '#6aa253');
+      circle(px, d.h*0.8, sx(5*t.s), level===2 ? '#d9efff' : level===3 ? '#b85439' : '#6aa84f');
     }
   });
 }
-function drawPlayer() {
-  const px = player.x, py = player.y;
+
+function drawPlayer(){
   x.save();
-  if (player.inv > 0 && Math.floor(performance.now() / 80) % 2 === 0) x.globalAlpha = 0.4;
-  rect(px - 8 * W.dpr, py - 10 * W.dpr, 18 * W.dpr, 10 * W.dpr, '#2cc7ff');
-  rect(px - 18 * W.dpr, py - 6 * W.dpr, 38 * W.dpr, 9 * W.dpr, '#ffffff');
-  circle(px + 10 * W.dpr, py - 6 * W.dpr, 8 * W.dpr, '#ffcf66');
-  line(px - 20 * W.dpr, py - 1 * W.dpr, px - 30 * W.dpr, py + 8 * W.dpr, '#c8d2ff', 4 * W.dpr);
+  if (player.inv > 0 && Math.floor(performance.now()/60)%2===0) x.globalAlpha = 0.35;
+  rect(player.x, player.y, player.w, player.h, '#5fd3ff');
+  rect(player.x+3*d.s, player.y+4*d.s, player.w-8*d.s, player.h-8*d.s, '#d8f8ff');
+  circle(player.x+player.w+8*d.s, player.y+player.h/2, 8*d.s, '#ffd25d');
+  line(player.x-10*d.s, player.y+2*d.s, player.x-22*d.s, player.y+10*d.s, '#c9d8ff', 4*d.s);
   x.restore();
 }
-function drawEnemies() {
-  enemies.forEach(e => {
-    if (e.kind === 'drone') {
-      rect(e.x, e.y, e.w, e.h, '#ff5d7e');
-      circle(e.x + e.w * 0.78, e.y + e.h / 2, 5 * W.dpr, '#fff');
-    } else if (e.kind === 'turret') {
-      rect(e.x, e.y, e.w, e.h, '#8c56ff');
-      rect(e.x + 4 * W.dpr, e.y - 8 * W.dpr, e.w - 8 * W.dpr, 10 * W.dpr, '#bda2ff');
-    } else {
-      rect(e.x, e.y, e.w, e.h, '#ff8f2f');
-      circle(e.x + e.w / 2, e.y + e.h / 2, 6 * W.dpr, '#000');
-    }
-    if (e.hp > 1) rect(e.x, e.y - 5 * W.dpr, e.w, 3 * W.dpr, '#000');
-    rect(e.x, e.y - 5 * W.dpr, e.w * Math.max(0, e.hp / 2), 3 * W.dpr, '#4dff8f');
-  });
-  if (boss) {
-    rect(boss.x, boss.y, boss.w, boss.h, '#c92f2f');
-    rect(boss.x + 14 * W.dpr, boss.y + 16 * W.dpr, boss.w - 28 * W.dpr, boss.h - 32 * W.dpr, '#691818');
-    circle(boss.x + boss.w - 24 * W.dpr, boss.y + boss.h / 2, 16 * W.dpr, '#ffd04d');
-    rect(boss.x, boss.y - 8 * W.dpr, boss.w * (boss.hp / boss.maxHp), 5 * W.dpr, '#43ff99');
-  }
+function drawEnemy(e){
+  if (e.kind==='drone') { rect(e.x,e.y,e.w,e.h,'#ff617f'); circle(e.x+e.w*0.8,e.y+e.h/2,4*d.s,'#fff'); }
+  if (e.kind==='swoop') { rect(e.x,e.y,e.w,e.h,'#ffa43d'); circle(e.x+e.w/2,e.y+e.h/2,5*d.s,'#2a0'); }
+  if (e.kind==='turret') { rect(e.x,e.y,e.w,e.h,'#a06dff'); rect(e.x+4*d.s,e.y-6*d.s,e.w-8*d.s,8*d.s,'#dac7ff'); }
+  if (e.hp>1) rect(e.x,e.y-5*d.s,e.w*0.65,3*d.s,'#000');
 }
-function drawBullets() {
-  bullets.forEach(b => circle(b.x, b.y, b.r, '#fff7d6'));
-  enemyBullets.forEach(b => circle(b.x, b.y, b.r, '#ffcb74'));
-}
-function drawParticles(dt) {
-  particles = particles.filter(p => (p.life -= dt) > 0);
-  particles.forEach(p => {
-    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 220 * dt;
-    x.globalAlpha = Math.max(0, p.life / 0.5);
-    circle(p.x, p.y, 3 * W.dpr, p.color);
-    x.globalAlpha = 1;
-  });
-}
-function update(dt) {
+function drawBoss(){ if(!boss) return; rect(boss.x,boss.y,boss.w,boss.h,'#cf3b3b'); rect(boss.x+14*d.s,boss.y+14*d.s,boss.w-28*d.s,boss.h-28*d.s,'#731919'); circle(boss.x+boss.w-24*d.s,boss.y+boss.h/2,18*d.s,'#ffd64d'); rect(boss.x,boss.y-10*d.s,boss.w*(boss.hp/boss.maxHp),5*d.s,'#45ff99'); }
+function drawBullets(){ bullets.forEach(b=> b.laser ? rect(b.x,b.y,b.w,b.h,'#f7ff8a') : circle(b.x,b.y,4*d.s,'#fff6d8')); eBullets.forEach(b=>circle(b.x,b.y,4*d.s,'#ffcb74')); }
+function drawParticles(){ particles = particles.filter(p => (p.life -= 0.016) > 0); particles.forEach(p => { p.x += p.vx*0.016; p.y += p.vy*0.016; p.vy += 240*0.016; x.globalAlpha = Math.max(0, p.life/0.45); circle(p.x,p.y,3*d.s,p.c); x.globalAlpha = 1; }); }
+
+function update(dt){
   if (!running) return;
-  const L = levelDefs[levelIndex];
-  levelTimer += dt;
-  fireCooldown = Math.max(0, fireCooldown - dt);
   player.inv = Math.max(0, player.inv - dt);
-
-  if (keys.ArrowUp || keys.KeyW) player.y -= player.speed * dt;
-  if (keys.ArrowDown || keys.KeyS) player.y += player.speed * dt;
-  if (keys.ArrowLeft || keys.KeyA) player.x -= player.speed * dt;
-  if (keys.ArrowRight || keys.KeyD) player.x += player.speed * dt;
-  player.x = clamp(player.x, 26 * W.dpr, W.w * 0.42);
-  player.y = clamp(player.y, 40 * W.dpr, W.h - 36 * W.dpr);
-
-  if (keys.Space || keys.KeyZ || keys.Enter) shoot(true);
-
+  laserHeat = Math.max(0, laserHeat - dt);
   spawnTimer -= dt;
-  if (spawnTimer <= 0 && !boss) {
-    spawnEnemy();
-    spawnTimer = rand(0.65, 1.25) / L.enemyRate;
+  bossTimer += dt;
+  score += dt*2;
+
+  if (!player.dragging) {
+    let ax = 0, ay = 0;
+    if (keys.KeyA || keys.ArrowLeft) ax -= 1;
+    if (keys.KeyD || keys.ArrowRight) ax += 1;
+    if (keys.KeyW || keys.ArrowUp) ay -= 1;
+    if (keys.KeyS || keys.ArrowDown) ay += 1;
+    player.x += ax * 260 * d.s * dt;
+    player.y += ay * 260 * d.s * dt;
   }
+  player.x = clamp(player.x, sx(14), d.w*0.42);
+  player.y = clamp(player.y, sy(30), d.h - sy(44));
 
-  if (!boss && levelTimer > 28) spawnBoss();
+  if (spawnTimer <= 0 && !boss) { enemies.push(makeEnemy()); spawnTimer = rand(0.45, 1.0); }
+  if (!boss && bossTimer > 24) spawnBoss();
 
-  bullets = bullets.filter(b => (b.x += b.vx * dt) < W.w + 40 && b.y > -40 && b.y < W.h + 40);
-  enemyBullets = enemyBullets.filter(b => (b.x += b.vx * dt) > -40 && b.y > -40 && b.y < W.h + 40);
+  bullets.forEach(b => b.x += b.vx*dt);
+  bullets = bullets.filter(b => b.x < d.w + 60);
 
-  enemies.forEach(e => { e.x += e.vx * dt; e.y += e.vy * dt; e.shoot -= dt; if (e.shoot <= 0 && e.kind !== 'charger') { enemyBullets.push({ x: e.x, y: e.y + e.h/2, vx: -260 * W.dpr, vy: 0, r: 4 * W.dpr }); e.shoot = rand(1.1, 2.2); } });
-  enemies = enemies.filter(e => e.x > -100 && e.hp > 0);
+  eBullets.forEach(b => { b.x += b.vx*dt; b.y += b.vy*dt; });
+  eBullets = eBullets.filter(b => b.x > -60 && b.y > -60 && b.y < d.h+60);
+
+  enemies.forEach(e => {
+    e.x += e.vx*dt;
+    e.y += e.vy*dt;
+    e.vy *= 0.99;
+    e.fire -= dt;
+    if (e.fire <= 0 && e.kind !== 'swoop') { eBullets.push({x:e.x,y:e.y+e.h/2,vx:-270*d.s,vy:0,r:4*d.s}); e.fire = rand(0.9,1.8); }
+  });
 
   if (boss) {
-    boss.x += boss.vx * dt;
-    boss.y += Math.sin(levelTimer * 1.8) * 0.6 * W.dpr;
+    boss.x += boss.vx*dt;
+    boss.y += Math.sin(bossTimer*2) * 40 * dt;
     boss.fire -= dt;
     if (boss.fire <= 0) {
-      for (let i = -2; i <= 2; i++) enemyBullets.push({ x: boss.x + 12 * W.dpr, y: boss.y + boss.h / 2 + i * 12 * W.dpr, vx: -320 * W.dpr, vy: i * 30 * W.dpr, r: 4 * W.dpr });
-      boss.fire = 0.5;
+      for (let i=-2;i<=2;i++) eBullets.push({x:boss.x+12*d.s,y:boss.y+boss.h/2+i*12*d.s,vx:-320*d.s,vy:i*28*d.s,r:5*d.s});
+      boss.fire = 0.55;
     }
-    if (boss.x < W.w * 0.56) boss.vx = 0;
+    if (boss.x < d.w*0.58) boss.vx = 0;
   }
 
   bullets.forEach(b => {
     enemies.forEach(e => {
-      if (e.hp > 0 && rectHit({ x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 }, e)) {
-        e.hp--;
-        b.x = W.w + 999;
-        score += 50;
-        addParticle(e.x, e.y, '#fff1a8');
-      }
+      if (e.hp > 0 && boxOverlap({x:b.x,y:b.y,w:b.w||6*d.s,h:b.h||6*d.s}, e)) { e.hp--; b.x = d.w + 99; score += 60; puff(e.x,e.y,'#fff0a6'); }
     });
-    if (boss && rectHit({ x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 }, boss)) {
-      boss.hp--;
-      b.x = W.w + 999;
-      score += 80;
-      bossHitFlash = 0.12;
-      addParticle(boss.x + rand(0, boss.w), boss.y + rand(0, boss.h), '#ffbf5c');
-      if (boss.hp <= 0) {
-        score += 1000;
-        flash = 0.45;
-        shake = 24;
-        addParticle(boss.x + boss.w / 2, boss.y + boss.h / 2, '#ffffff');
-        boss = null;
-        if (levelIndex < levelDefs.length - 1) {
-          levelIndex++;
-          setTimeout(() => resetLevel(levelIndex), 700);
-        } else {
-          running = false;
-          overlay.classList.remove('hidden');
-          overlay.querySelector('h1').textContent = 'You Win!';
-          overlay.querySelector('p').textContent = `Final score ${score}. Tap restart to play again.`;
-          startBtn.textContent = 'Restart';
-        }
-      }
-    }
+    if (boss && boxOverlap({x:b.x,y:b.y,w:b.w||6*d.s,h:b.h||6*d.s}, boss)) { boss.hp--; b.x = d.w + 99; score += 90; puff(boss.x + rand(0,boss.w), boss.y + rand(0,boss.h), '#ffd17a'); if (boss.hp <= 0) { score += 1000; puff(boss.x+boss.w/2,boss.y+boss.h/2,'#ffffff'); boss = null; if (level < 3) { level++; resetLevel(level-1); bossTimer = 0; } else { running = false; statusEl.textContent = 'You win! Tap to restart.'; } } }
   });
 
-  enemyBullets.forEach(b => { if (rectHit({ x: player.x - 12 * W.dpr, y: player.y - 12 * W.dpr, w: 24 * W.dpr, h: 24 * W.dpr }, { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 })) { b.x = -999; hitPlayer(); } });
-  enemies.forEach(e => { if (rectHit({ x: player.x - 12 * W.dpr, y: player.y - 12 * W.dpr, w: 24 * W.dpr, h: 24 * W.dpr }, e)) hitPlayer(); });
-  if (boss && rectHit({ x: player.x - 12 * W.dpr, y: player.y - 12 * W.dpr, w: 24 * W.dpr, h: 24 * W.dpr }, boss)) hitPlayer();
+  eBullets.forEach(b => { if (boxOverlap({x:player.x,y:player.y,w:player.w,h:player.h}, {x:b.x,y:b.y,w:8*d.s,h:8*d.s})) { b.x=-999; if (player.inv===0) { player.inv = 1.0; score = Math.max(0, score - 100); } } });
+  enemies.forEach(e => { if (boxOverlap({x:player.x,y:player.y,w:player.w,h:player.h}, e) && player.inv===0) { player.inv = 1.0; score = Math.max(0, score - 150); puff(player.x,player.y,'#fff'); } });
+  if (boss && boxOverlap({x:player.x,y:player.y,w:player.w,h:player.h}, boss) && player.inv===0) { player.inv = 1.0; score = Math.max(0, score - 200); }
 
-  if (Math.random() < 0.002) powerups.push({ x: W.w + 30, y: rand(W.h * 0.2, W.h * 0.75), kind: 'bomb', vx: -130 * W.dpr });
-  powerups.forEach(p => p.x += p.vx * dt);
-  powerups = powerups.filter(p => p.x > -40);
-  powerups.forEach(p => { if (rectHit({ x: player.x - 12 * W.dpr, y: player.y - 12 * W.dpr, w: 24 * W.dpr, h: 24 * W.dpr }, { x: p.x - 10 * W.dpr, y: p.y - 10 * W.dpr, w: 20 * W.dpr, h: 20 * W.dpr })) { if (p.kind === 'bomb') bombs++; p.x = -999; statusEl.textContent = 'Bomb picked up'; }});
-
-  score += dt * 2;
-  if (Math.floor(levelTimer) % 10 === 0) statsEl.textContent = `Score ${Math.floor(score)} · Bombs ${bombs} · Level ${levelIndex + 1}`;
-  if (flash > 0) flash = Math.max(0, flash - dt);
-  if (bossHitFlash > 0) bossHitFlash = Math.max(0, bossHitFlash - dt);
-  if (shake > 0) shake = Math.max(0, shake - 40 * dt);
+  enemies = enemies.filter(e => e.hp > 0 && e.x > -120);
+  particles = particles.filter(p => p.life > 0);
+  updateHud();
 }
-function render(dt) {
+
+function render(dt){
   x.setTransform(1,0,0,1,0,0);
-  x.clearRect(0,0,W.w,W.h);
-  const ox = shake ? rand(-shake, shake) : 0;
-  const oy = shake ? rand(-shake, shake) : 0;
-  x.save();
-  x.translate(ox, oy);
+  x.clearRect(0,0,d.w,d.h);
   drawBackground(dt);
   drawBullets();
-  drawEnemies();
+  enemies.forEach(drawEnemy);
+  drawBoss();
   drawPlayer();
-  drawParticles(dt);
-  x.restore();
+  drawParticles();
+  if (!running) { x.fillStyle='rgba(0,0,0,.35)'; x.fillRect(0,0,d.w,d.h); }
+}
+function loop(ts){ if(!last) last = ts; const dt = Math.min(0.033,(ts-last)/1000); last = ts; update(dt); render(dt); requestAnimationFrame(loop); }
 
-  if (flash > 0) { x.fillStyle = `rgba(255,255,255,${flash})`; x.fillRect(0,0,W.w,W.h); }
-  if (bossHitFlash > 0) { x.fillStyle = `rgba(255,230,120,${bossHitFlash})`; x.fillRect(0,0,W.w,W.h); }
-  if (!running) {
-    x.fillStyle = 'rgba(0,0,0,.3)'; x.fillRect(0,0,W.w,W.h);
-    x.fillStyle = '#fff'; x.font = `${18 * W.dpr}px system-ui`; x.fillText('Tap Start', W.w * 0.42, W.h * 0.84);
-  }
-}
-function loop(ts) { if (!last) last = ts; const dt = Math.min(0.033, (ts - last) / 1000); last = ts; update(dt); render(dt); requestAnimationFrame(loop); }
-function startGame() {
-  overlay.classList.add('hidden');
-  overlay.querySelector('h1').textContent = 'MarksSHMUP';
-  overlay.querySelector('p').textContent = 'Arcade side-scroller, touch-friendly, 3 levels, enemies, bombs, boss fight.';
-  startBtn.textContent = 'Start';
-  score = 0; lives = 3; bombs = 3; player.inv = 1.2; running = true; resetLevel(0);
-}
-function bindHold(btn, onDown, onUp) {
-  const start = e => { e.preventDefault(); onDown(); };
-  const end = e => { e.preventDefault(); onUp && onUp(); };
-  btn.addEventListener('pointerdown', start);
-  btn.addEventListener('pointerup', end);
-  btn.addEventListener('pointerleave', end);
-  btn.addEventListener('pointercancel', end);
-}
-function bindTouchControls() {
-  let left = false, right = false, fire = false;
-  bindHold(leftBtn, () => { left = true; keys.KeyA = true; }, () => { left = false; keys.KeyA = false; });
-  bindHold(rightBtn, () => { right = true; keys.KeyD = true; }, () => { right = false; keys.KeyD = false; });
-  bindHold(fireBtn, () => { fire = true; keys.Space = true; }, () => { fire = false; keys.Space = false; });
-  bombBtn.addEventListener('pointerdown', e => { e.preventDefault(); bomb(); });
-}
-window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'KeyX') bomb(); });
+function startGame(){ running = true; overlay.classList.add('hidden'); score = 0; bombs = 3; level = 1; player.inv = 1; bossTimer = 0; reset(); }
+
+canvas.addEventListener('pointerdown', e => {
+  if (!running) return startGame();
+  const mx = e.clientX * d.s, my = e.clientY * d.s;
+  if (pointInPlayer(mx,my)) { player.dragging = true; player.dragDX = mx - player.x; player.dragDY = my - player.y; }
+});
+canvas.addEventListener('pointermove', e => {
+  if (!player.dragging) return;
+  const mx = e.clientX * d.s, my = e.clientY * d.s;
+  player.x = clamp(mx - player.dragDX, sx(14), d.w*0.42);
+  player.y = clamp(my - player.dragDY, sy(30), d.h - sy(44));
+});
+canvas.addEventListener('pointerup', () => { player.dragging = false; });
+canvas.addEventListener('pointercancel', () => { player.dragging = false; });
+
+bombBtn.addEventListener('click', bomb);
+laserBtn.addEventListener('click', fireLaser);
+window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'KeyX') bomb(); if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyZ') fireLaser(); });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('resize', resize);
-startBtn.addEventListener('click', startGame);
-canvas.addEventListener('pointerdown', () => { if (!running) startGame(); });
-canvas.addEventListener('pointermove', e => {
-  if (!running) return;
-  if (e.buttons) {
-    const x0 = e.clientX * W.dpr;
-    if (x0 < W.w * 0.33) keys.KeyA = true, keys.KeyD = false;
-    else if (x0 > W.w * 0.67) keys.KeyD = true, keys.KeyA = false;
-    else { keys.KeyA = false; keys.KeyD = false; }
-    if (e.clientY * W.dpr < W.h * 0.55) keys.Space = true;
-  }
-});
-canvas.addEventListener('pointerup', () => { keys.KeyA = false; keys.KeyD = false; keys.Space = false; });
-bindTouchControls();
-resize();
-buildTerrain();
-resetLevel(0);
-requestAnimationFrame(loop);
+resize(); buildTerrain(); reset(); requestAnimationFrame(loop);
