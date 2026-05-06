@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>MarksSHMUP</title>
+    <meta name="description" content="A tiny mobile-friendly shmup prototype." />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="hud">
+      <div><strong>MARKS SHMUP</strong></div>
+      <div id="status">Tap to start</div>
+      <div id="stats">Score 0 · Bombs 3 · Level 1</div>
+    </div>
+    <div id="touchUI">
+      <button id="leftBtn">◀</button>
+      <button id="fireBtn">FIRE</button>
+      <button id="rightBtn">▶</button>
+      <button id="bombBtn">BOMB</button>
+    </div>
+    <div id="overlay">
+      <div class="panel">
+        <h1>MarksSHMUP</h1>
+        <p>Arcade side-scroller, touch-friendly, 3 levels, enemies, bombs, boss fight.</p>
+        <button id="startBtn">Start</button>
+      </div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
