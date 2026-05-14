@@ -8,12 +8,13 @@ const laserBtn = document.getElementById('laserBtn');
 const d = { w: 0, h: 0, s: 1 };
 let running = true, last = 0, score = 0, bombs = 3, level = 1;
 let started = false;
+let autoFire = false;
 let player = { x: 120, y: 260, w: 34, h: 22, vx: 0, vy: 0, dragging: false, dragDX: 0, dragDY: 0, inv: 0 };
 let bullets = [], eBullets = [], enemies = [], particles = [], boss = null, terrain = [];
 let laserHeat = 0, spawnTimer = 0, terrainScroll = 0, bossTimer = 0;
 let keys = {};
 
-function resize(){ d.s = Math.min(devicePixelRatio || 1, 2); d.w = c.width = Math.floor(innerWidth * d.s); d.h = c.height = Math.floor(innerHeight * d.s); c.style.width='100vw'; c.style.height='100vh'; }
+function resize(){ d.s = Math.min(window.devicePixelRatio || 1, 2); d.w = c.width = Math.floor(innerWidth * d.s); d.h = c.height = Math.floor(innerHeight * d.s); c.style.width='100vw'; c.style.height='100vh'; }
 function sx(v){ return v * d.s; }
 function sy(v){ return v * d.s; }
 function rect(x0,y0,w,h,c0){ x.fillStyle=c0; x.fillRect(x0,y0,w,h); }
@@ -28,15 +29,15 @@ function buildTerrain(){
   for(let i=0;i<35;i++) terrain.push({ x: rand(0,2200), y: rand(0.1,0.9), kind: i%7===0 ? 'rock':'tree', s: rand(0.6,1.35) });
 }
 function reset(){
-  bullets=[]; eBullets=[]; enemies=[]; particles=[]; boss=null; laserHeat=0; spawnTimer=0.6; bossTimer=0; terrainScroll=0; score=0; bombs=3; level=1;
+  bullets=[]; eBullets=[]; enemies=[]; particles=[]; boss=null; laserHeat=0; spawnTimer=0.2; bossTimer=0; terrainScroll=0; score=0; bombs=3; level=1;
   player = { x: 110*d.s, y: d.h*0.55, w: 34*d.s, h: 22*d.s, vx: 0, vy: 0, dragging: false, dragDX: 0, dragDY: 0, inv: 1.0 };
-  for(let i=0;i<9;i++) enemies.push(makeEnemy(true));
+  for(let i=0;i<5;i++) enemies.push(makeEnemy(true));
   statusEl.textContent = 'Touch ship and drag. Use BOMB / LASER.';
   updateHud();
 }
 function updateHud(){ statsEl.textContent = `Score ${Math.floor(score)} · Bombs ${bombs} · Level ${level}`; statusEl.textContent = !started ? 'Tap play to start, then drag ship.' : (running ? (boss ? 'Boss fight!' : 'Touch ship and drag. Use BOMB / LASER.') : 'You win! Tap to restart.'); }
 function makeEnemy(offscreen=false){
-  const y = rand(d.h*0.14, d.h*0.84);
+  const y = rand(d.h*0.12, d.h*0.82);
   const kind = Math.random() < 0.5 ? 'drone' : (Math.random() < 0.8 ? 'swoop' : 'turret');
   return { kind, x: offscreen ? d.w + rand(0,500) : d.w + 60, y, w: 28*d.s, h: 18*d.s, hp: kind==='turret' ? 3 : 1, vx: rand(-120,-220)*d.s, vy: kind==='swoop' ? rand(-50,50)*d.s : 0, fire: rand(0.5,2.0) };
 }
@@ -68,6 +69,7 @@ function drawBackground(dt){
   sky.addColorStop(1,'#08111f');
   x.fillStyle = sky; x.fillRect(0,0,d.w,d.h);
   rect(0,d.h*0.78,d.w,d.h*0.22, level===2 ? '#35457a' : level===3 ? '#4b241c' : '#1f5b2f');
+  rect(0,0,d.w,sy(2),'#ffffff');
 
   x.save();
   x.translate(-terrainScroll % sx(220), 0);
@@ -188,6 +190,8 @@ function render(dt){
   drawBoss();
   drawPlayer();
   drawParticles();
+  x.fillStyle='#fff'; x.font=`${14*d.s}px system-ui`;
+  x.fillText(`player ${Math.floor(player.x)},${Math.floor(player.y)}`, sx(16), sy(56));
   if (!started) {
     x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(0,0,d.w,d.h);
     x.fillStyle='#fff'; x.font=`${18*d.s}px system-ui`; x.fillText('Tap to start', sx(18), sy(36));
