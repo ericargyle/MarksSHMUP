@@ -85,8 +85,8 @@ function update(dt){
   fireCooldown = Math.max(0, fireCooldown - dt);
 
   let dx = 0, dy = 0;
-  if (keys.KeyA || keys.ArrowLeft) dx -= 1;
-  if (keys.KeyD || keys.ArrowRight) dx += 1;
+  if (keys.KeyA) dx -= 1;
+  if (keys.KeyD) dx += 1;
   if (keys.KeyW) dy -= 1;
   if (keys.KeyS) dy += 1;
 
@@ -128,12 +128,19 @@ function loop(ts){
 }
 
 c.addEventListener('pointerdown', () => { started = true; });
-window.addEventListener('keydown', e => { started = true; keys[e.code] = true; if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') e.preventDefault(); });
-window.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') e.preventDefault(); });
+window.addEventListener('keydown', e => {
+  started = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+});
+window.addEventListener('keyup', e => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  keys[e.code] = false;
+});
 window.addEventListener('resize', resize);
 
 resize();
 ship.x = W * 0.5 - ship.w * 0.5;
 ship.y = H * 0.65;
-hud.textContent = 'WASD move, arrows shoot only.';
+hud.textContent = 'WASD moves, arrows fire only.';
 requestAnimationFrame(loop);
