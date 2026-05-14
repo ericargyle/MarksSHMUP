@@ -7,18 +7,24 @@ let keys = {};
 let pointer = { down: false, id: null, offsetX: 0, offsetY: 0 };
 let ship = { x: 0, y: 0, w: 44, h: 26, speed: 220 };
 let stars = [];
+let started = false;
 
 function resize(){
   dpr = Math.min(window.devicePixelRatio || 1, 2);
-  W = c.width = Math.floor(innerWidth * dpr);
-  H = c.height = Math.floor(innerHeight * dpr);
+  const vw = Math.max(1, window.innerWidth);
+  const vh = Math.max(1, window.innerHeight);
+  W = c.width = Math.floor(vw * dpr);
+  H = c.height = Math.floor(vh * dpr);
   c.style.width = '100vw';
   c.style.height = '100vh';
   ship.w = Math.max(34 * dpr, Math.min(52 * dpr, Math.floor(Math.min(W, H) * 0.08)));
   ship.h = ship.w * 0.6;
-  if (!ship.x && !ship.y) {
+  if (!started) {
     ship.x = W * 0.5 - ship.w * 0.5;
     ship.y = H * 0.65;
+  } else {
+    ship.x = clamp(ship.x, 8 * dpr, W - ship.w - 8 * dpr);
+    ship.y = clamp(ship.y, 8 * dpr, H - ship.h - 8 * dpr);
   }
   if (stars.length === 0) {
     for (let i = 0; i < 60; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 2 + 1, s: Math.random() * 0.35 + 0.1 });
@@ -64,10 +70,18 @@ function draw(){
     if (s.x < 0) { s.x = W; s.y = Math.random() * H; }
     circle(s.x, s.y, s.r * dpr, '#ffffff');
   });
+  if (!started) {
+    x.fillStyle = 'rgba(255,255,255,0.12)';
+    x.fillRect(0,0,W,H);
+    x.fillStyle = '#ffffff';
+    x.font = `${18 * dpr}px system-ui`;
+    x.fillText('Tap to start', 18 * dpr, 36 * dpr);
+  }
   drawShip();
 }
 
 function update(dt){
+  if (!started) return;
   let dx = 0, dy = 0;
   if (keys.KeyA || keys.ArrowLeft) dx -= 1;
   if (keys.KeyD || keys.ArrowRight) dx += 1;
@@ -92,6 +106,11 @@ function loop(ts){
 c.addEventListener('pointerdown', e => {
   const px = e.clientX * dpr;
   const py = e.clientY * dpr;
+  if (!started) {
+    started = true;
+    resize();
+    return;
+  }
   if (insideShip(px, py)) {
     pointer.down = true;
     pointer.id = e.pointerId;
@@ -114,7 +133,7 @@ c.addEventListener('pointerup', e => {
   }
 });
 c.addEventListener('pointercancel', () => { pointer.down = false; pointer.id = null; });
-window.addEventListener('keydown', e => { keys[e.code] = true; });
+window.addEventListener('keydown', e => { started = true; keys[e.code] = true; });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('resize', resize);
 
