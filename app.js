@@ -5,9 +5,10 @@ const hud = document.getElementById('hud');
 let dpr = 1, W = 0, H = 0;
 let started = false;
 let keys = {};
-let touch = { active: false, id: null, x: 0, y: 0, targetX: 0, targetY: 0 };
 let ship = { x: 0, y: 0, w: 44, h: 26, speed: 260 };
 let stars = [];
+let bullets = [];
+let fireCooldown = 0;
 
 function resize(){
   dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -19,12 +20,8 @@ function resize(){
   c.style.height = '100vh';
   ship.w = Math.max(34 * dpr, Math.min(52 * dpr, Math.floor(Math.min(W, H) * 0.08)));
   ship.h = ship.w * 0.6;
-  if (!ship.x && !ship.y) {
-    ship.x = W * 0.5 - ship.w * 0.5;
-    ship.y = H * 0.65;
-  }
-  ship.x = clamp(ship.x, 8 * dpr, W - ship.w - 8 * dpr);
-  ship.y = clamp(ship.y, 8 * dpr, H - ship.h - 8 * dpr);
+  ship.x = clamp(ship.x || (W * 0.5 - ship.w * 0.5), 8 * dpr, W - ship.w - 8 * dpr);
+  ship.y = clamp(ship.y || (H * 0.65), 8 * dpr, H - ship.h - 8 * dpr);
   if (stars.length === 0) {
     for (let i = 0; i < 60; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 2 + 1, s: Math.random() * 0.35 + 0.1 });
   }
@@ -61,6 +58,10 @@ function drawShip(){
   x.restore();
 }
 
+function drawBullets(){
+  bullets.forEach(b => circle(b.x, b.y, 4 * dpr, '#fff8df'));
+}
+
 function draw(){
   rect(0,0,W,H,'#08111f');
   stars.forEach(s => {
@@ -68,11 +69,20 @@ function draw(){
     if (s.x < 0) { s.x = W; s.y = Math.random() * H; }
     circle(s.x, s.y, s.r * dpr, '#ffffff');
   });
+  drawBullets();
   drawShip();
+  if (!started) {
+    x.fillStyle = 'rgba(255,255,255,0.12)';
+    x.fillRect(0,0,W,H);
+    x.fillStyle = '#ffffff';
+    x.font = `${18 * dpr}px system-ui`;
+    x.fillText('Press a key or click to start', 18 * dpr, 36 * dpr);
+  }
 }
 
 function update(dt){
   if (!started) return;
+  fireCooldown = Math.max(0, fireCooldown - dt);
 
   let dx = 0, dy = 0;
   if (keys.KeyA || keys.ArrowLeft) dx -= 1;
@@ -80,20 +90,32 @@ function update(dt){
   if (keys.KeyW || keys.ArrowUp) dy -= 1;
   if (keys.KeyS || keys.ArrowDown) dy += 1;
 
-  if (touch.active) {
-    const tx = clamp(touch.targetX, 8 * dpr, W - ship.w - 8 * dpr);
-    const ty = clamp(touch.targetY, 8 * dpr, H - ship.h - 8 * dpr);
-    const ease = 0.16;
-    ship.x += (tx - ship.x) * ease;
-    ship.y += (ty - ship.y) * ease;
-  } else {
-    const len = Math.hypot(dx, dy) || 1;
-    ship.x += (dx / len) * ship.speed * dpr * dt;
-    ship.y += (dy / len) * ship.speed * dpr * dt;
-  }
+  const len = Math.hypot(dx, dy) || 1;
+  ship.x += (dx / len) * ship.speed * dpr * dt;
+  ship.y += (dy / len) * ship.speed * dpr * dt;
 
   ship.x = clamp(ship.x, 8 * dpr, W - ship.w - 8 * dpr);
   ship.y = clamp(ship.y, 8 * dpr, H - ship.h - 8 * dpr);
+
+  if (keys.ArrowUp) shoot(0, -1);
+  if (keys.ArrowDown) shoot(0, 1);
+  if (keys.ArrowLeft) shoot(-1, 0);
+  if (keys.ArrowRight) shoot(1, 0);
+
+  bullets.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; });
+  bullets = bullets.filter(b => b.x > -20 && b.x < W + 20 && b.y > -20 && b.y < H + 20);
+}
+
+function shoot(vx, vy){
+  if (fireCooldown > 0) return;
+  const speed = 520 * dpr;
+  bullets.push({
+    x: ship.x + ship.w * 0.5,
+    y: ship.y + ship.h * 0.5,
+    vx: vx * speed,
+    vy: vy * speed,
+  });
+  fireCooldown = 0.14;
 }
 
 function loop(ts){
@@ -105,45 +127,7 @@ function loop(ts){
   requestAnimationFrame(loop);
 }
 
-function startFromTouch(e){
-  started = true;
-  touch.active = true;
-  touch.id = e.pointerId;
-  touch.x = e.clientX * dpr;
-  touch.y = e.clientY * dpr;
-  touch.targetX = touch.x - ship.w * 0.5;
-  touch.targetY = touch.y - ship.h * 0.5;
-  c.setPointerCapture(e.pointerId);
-}
-
-c.addEventListener('pointerdown', e => {
-  const px = e.clientX * dpr;
-  const py = e.clientY * dpr;
-  if (!started) {
-    startFromTouch(e);
-    return;
-  }
-  if (Math.hypot(px - (ship.x + ship.w / 2), py - (ship.y + ship.h / 2)) < ship.w) {
-    startFromTouch(e);
-  }
-});
-
-c.addEventListener('pointermove', e => {
-  if (!touch.active || touch.id !== e.pointerId) return;
-  touch.x = e.clientX * dpr;
-  touch.y = e.clientY * dpr;
-  touch.targetX = touch.x - ship.w * 0.5;
-  touch.targetY = touch.y - ship.h * 0.5;
-});
-
-function stopTouch(e){
-  if (touch.id !== e.pointerId) return;
-  touch.active = false;
-  touch.id = null;
-}
-
-c.addEventListener('pointerup', stopTouch);
-c.addEventListener('pointercancel', stopTouch);
+c.addEventListener('pointerdown', () => { started = true; });
 window.addEventListener('keydown', e => { started = true; keys[e.code] = true; });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('resize', resize);
@@ -151,5 +135,5 @@ window.addEventListener('resize', resize);
 resize();
 ship.x = W * 0.5 - ship.w * 0.5;
 ship.y = H * 0.65;
-hud.textContent = 'WASD on desktop, or drag anywhere on the screen on mobile.';
+hud.textContent = 'WASD to move, arrow keys shoot up/down/left/right.';
 requestAnimationFrame(loop);
