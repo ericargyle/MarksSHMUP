@@ -1,11 +1,11 @@
 const c = document.getElementById('game');
 const x = c.getContext('2d');
 const hud = document.getElementById('hud');
+const footnote = document.getElementById('footnote');
 
 let dpr = 1, W = 0, H = 0;
 let started = false;
-let moveKeys = {};
-let fireKeys = {};
+let keys = {};
 let ship = { x: 0, y: 0, w: 44, h: 26, speed: 260 };
 let stars = [];
 let bullets = [];
@@ -86,10 +86,10 @@ function update(dt){
   fireCooldown = Math.max(0, fireCooldown - dt);
 
   let dx = 0, dy = 0;
-  if (moveKeys.KeyA) dx -= 1;
-  if (moveKeys.KeyD) dx += 1;
-  if (moveKeys.KeyW) dy -= 1;
-  if (moveKeys.KeyS) dy += 1;
+  if (keys.KeyA) dx -= 1;
+  if (keys.KeyD) dx += 1;
+  if (keys.KeyW) dy -= 1;
+  if (keys.KeyS) dy += 1;
 
   const len = Math.hypot(dx, dy) || 1;
   ship.x += (dx / len) * ship.speed * dpr * dt;
@@ -98,10 +98,10 @@ function update(dt){
   ship.x = clamp(ship.x, 8 * dpr, W - ship.w - 8 * dpr);
   ship.y = clamp(ship.y, 8 * dpr, H - ship.h - 8 * dpr);
 
-  if (fireKeys.ArrowUp) shoot(0, -1);
-  if (fireKeys.ArrowDown) shoot(0, 1);
-  if (fireKeys.ArrowLeft) shoot(-1, 0);
-  if (fireKeys.ArrowRight) shoot(1, 0);
+  if (keys.ArrowUp) shoot(0, -1);
+  if (keys.ArrowDown) shoot(0, 1);
+  if (keys.ArrowLeft) shoot(-1, 0);
+  if (keys.ArrowRight) shoot(1, 0);
 
   bullets.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; });
   bullets = bullets.filter(b => b.x > -20 && b.x < W + 20 && b.y > -20 && b.y < H + 20);
@@ -129,27 +129,14 @@ function loop(ts){
 }
 
 c.addEventListener('pointerdown', () => { started = true; });
-window.addEventListener('keydown', e => {
-  started = true;
-  if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-    e.preventDefault();
-    fireKeys[e.code] = true;
-    return;
-  }
-  moveKeys[e.code] = true;
-});
-window.addEventListener('keyup', e => {
-  if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-    e.preventDefault();
-    fireKeys[e.code] = false;
-    return;
-  }
-  moveKeys[e.code] = false;
-});
+window.addEventListener('keydown', e => { started = true; keys[e.code] = true; });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('resize', resize);
 
 resize();
 ship.x = W * 0.5 - ship.w * 0.5;
 ship.y = H * 0.65;
-hud.textContent = 'WASD moves, arrows fire only.';
+const now = new Date();
+const stamp = now.toLocaleString('en-US', { timeZone: 'America/Chicago', hour12: true });
+footnote.textContent = `Synced ${stamp} CST`;
 requestAnimationFrame(loop);
