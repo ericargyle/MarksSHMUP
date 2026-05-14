@@ -7,6 +7,7 @@ const laserBtn = document.getElementById('laserBtn');
 
 const d = { w: 0, h: 0, s: 1 };
 let running = true, last = 0, score = 0, bombs = 3, level = 1;
+let started = false;
 let player = { x: 120, y: 260, w: 34, h: 22, vx: 0, vy: 0, dragging: false, dragDX: 0, dragDY: 0, inv: 0 };
 let bullets = [], eBullets = [], enemies = [], particles = [], boss = null, terrain = [];
 let laserHeat = 0, spawnTimer = 0, terrainScroll = 0, bossTimer = 0;
@@ -33,7 +34,7 @@ function reset(){
   statusEl.textContent = 'Touch ship and drag. Use BOMB / LASER.';
   updateHud();
 }
-function updateHud(){ statsEl.textContent = `Score ${Math.floor(score)} · Bombs ${bombs} · Level ${level}`; statusEl.textContent = running ? (boss ? 'Boss fight!' : 'Touch ship and drag. Use BOMB / LASER.') : 'You win! Tap to restart.'; }
+function updateHud(){ statsEl.textContent = `Score ${Math.floor(score)} · Bombs ${bombs} · Level ${level}`; statusEl.textContent = !started ? 'Tap play to start, then drag ship.' : (running ? (boss ? 'Boss fight!' : 'Touch ship and drag. Use BOMB / LASER.') : 'You win! Tap to restart.'); }
 function makeEnemy(offscreen=false){
   const y = rand(d.h*0.14, d.h*0.84);
   const kind = Math.random() < 0.5 ? 'drone' : (Math.random() < 0.8 ? 'swoop' : 'turret');
@@ -187,13 +188,17 @@ function render(dt){
   drawBoss();
   drawPlayer();
   drawParticles();
-  if (!running) { x.fillStyle='rgba(0,0,0,.35)'; x.fillRect(0,0,d.w,d.h); }
+  if (!started) {
+    x.fillStyle='rgba(0,0,0,.45)'; x.fillRect(0,0,d.w,d.h);
+    x.fillStyle='#fff'; x.font=`${18*d.s}px system-ui`; x.fillText('Tap to start', sx(18), sy(36));
+  } else if (!running) { x.fillStyle='rgba(0,0,0,.35)'; x.fillRect(0,0,d.w,d.h); }
 }
 function loop(ts){ if(!last) last = ts; const dt = Math.min(0.033,(ts-last)/1000); last = ts; update(dt); render(dt); requestAnimationFrame(loop); }
 
-function startGame(){ running = true; overlay.classList.add('hidden'); score = 0; bombs = 3; level = 1; player.inv = 1; bossTimer = 0; reset(); }
+function startGame(){ started = true; running = true; overlay.classList.add('hidden'); score = 0; bombs = 3; level = 1; player.inv = 1; bossTimer = 0; reset(); }
 
 canvas.addEventListener('pointerdown', e => {
+  if (!started) return startGame();
   if (!running) return startGame();
   const mx = e.clientX * d.s, my = e.clientY * d.s;
   if (pointInPlayer(mx,my)) { player.dragging = true; player.dragDX = mx - player.x; player.dragDY = my - player.y; }
@@ -209,9 +214,9 @@ canvas.addEventListener('pointermove', e => {
 canvas.addEventListener('pointerup', () => { player.dragging = false; keys.KeyA=false; keys.KeyD=false; });
 canvas.addEventListener('pointercancel', () => { player.dragging = false; keys.KeyA=false; keys.KeyD=false; });
 
-bombBtn.addEventListener('click', bomb);
-laserBtn.addEventListener('click', fireLaser);
+bombBtn.addEventListener('click', e => { e.stopPropagation(); if (started) bomb(); });
+laserBtn.addEventListener('click', e => { e.stopPropagation(); if (started) fireLaser(); });
 window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'KeyX') bomb(); if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyZ') fireLaser(); });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('resize', resize);
-resize(); buildTerrain(); reset(); requestAnimationFrame(loop);
+resize(); buildTerrain(); reset(); updateHud(); requestAnimationFrame(loop);
