@@ -131,20 +131,20 @@ function loop(ts){
 c.addEventListener('pointerdown', () => { started = true; });
 window.addEventListener('keydown', e => {
   started = true;
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
     e.preventDefault();
     fireKeys[e.code] = true;
-  } else {
-    moveKeys[e.code] = true;
+    return;
   }
+  moveKeys[e.code] = true;
 });
 window.addEventListener('keyup', e => {
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
     e.preventDefault();
     fireKeys[e.code] = false;
-  } else {
-    moveKeys[e.code] = false;
+    return;
   }
+  moveKeys[e.code] = false;
 });
 window.addEventListener('resize', resize);
 
