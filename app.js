@@ -9,7 +9,10 @@ let keys = {};
 let ship = { x: 0, y: 0, w: 44, h: 26, speed: 260 };
 let stars = [];
 let bullets = [];
+let enemies = [];
 let fireCooldown = 0;
+let spawnCooldown = 0.6;
+let score = 0;
 
 function resize(){
   dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -63,6 +66,12 @@ function drawBullets(){
   bullets.forEach(b => circle(b.x, b.y, 4 * dpr, '#fff8df'));
 }
 
+function drawEnemies(){
+  enemies.forEach(e => {
+    rect(e.x, e.y, e.w, e.h, e.color);
+  });
+}
+
 function draw(){
   rect(0,0,W,H,'#08111f');
   stars.forEach(s => {
@@ -71,7 +80,11 @@ function draw(){
     circle(s.x, s.y, s.r * dpr, '#ffffff');
   });
   drawBullets();
+  drawEnemies();
   drawShip();
+  x.fillStyle = '#ffffff';
+  x.font = `${16 * dpr}px system-ui`;
+  x.fillText(`Score ${score}`, 16 * dpr, 54 * dpr);
   if (!started) {
     x.fillStyle = 'rgba(255,255,255,0.12)';
     x.fillRect(0,0,W,H);
@@ -81,9 +94,29 @@ function draw(){
   }
 }
 
+function spawnEnemy(){
+  const colors = [
+    { color: '#ff4b4b', score: 3, speed: 220 },
+    { color: '#ffd84a', score: 2, speed: 170 },
+    { color: '#4cff7a', score: 1, speed: 120 },
+  ];
+  const pick = colors[Math.floor(Math.random() * colors.length)];
+  const side = Math.floor(Math.random() * 4);
+  const size = ship.w;
+  let xPos = 0, yPos = 0, vx = 0, vy = 0;
+  if (side === 0) { xPos = -size; yPos = rand(20 * dpr, H - 20 * dpr - size); vx = pick.speed * dpr; }
+  if (side === 1) { xPos = W + size; yPos = rand(20 * dpr, H - 20 * dpr - size); vx = -pick.speed * dpr; }
+  if (side === 2) { xPos = rand(20 * dpr, W - 20 * dpr - size); yPos = -size; vy = pick.speed * dpr; }
+  if (side === 3) { xPos = rand(20 * dpr, W - 20 * dpr - size); yPos = H + size; vy = -pick.speed * dpr; }
+  enemies.push({ x: xPos, y: yPos, w: size, h: size, color: pick.color, value: pick.score, vx, vy, speed: pick.speed * dpr });
+}
+
+function overlap(a,b){ return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+
 function update(dt){
   if (!started) return;
   fireCooldown = Math.max(0, fireCooldown - dt);
+  spawnCooldown = Math.max(0, spawnCooldown - dt);
 
   let dx = 0, dy = 0;
   if (keys.KeyA) dx -= 1;
@@ -94,7 +127,6 @@ function update(dt){
   const len = Math.hypot(dx, dy) || 1;
   ship.x += (dx / len) * ship.speed * dpr * dt;
   ship.y += (dy / len) * ship.speed * dpr * dt;
-
   ship.x = clamp(ship.x, 8 * dpr, W - ship.w - 8 * dpr);
   ship.y = clamp(ship.y, 8 * dpr, H - ship.h - 8 * dpr);
 
@@ -103,19 +135,40 @@ function update(dt){
   if (keys.ArrowLeft) shoot(-1, 0);
   if (keys.ArrowRight) shoot(1, 0);
 
+  if (spawnCooldown <= 0) {
+    spawnEnemy();
+    spawnCooldown = 0.35 + Math.random() * 0.7;
+  }
+
   bullets.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; });
   bullets = bullets.filter(b => b.x > -20 && b.x < W + 20 && b.y > -20 && b.y < H + 20);
+
+  enemies.forEach(e => {
+    const dxE = ship.x - e.x;
+    const dyE = ship.y - e.y;
+    const lenE = Math.hypot(dxE, dyE) || 1;
+    e.x += (dxE / lenE) * e.speed * dt * 0.35 + e.vx * dt * 0.05;
+    e.y += (dyE / lenE) * e.speed * dt * 0.35 + e.vy * dt * 0.05;
+  });
+
+  bullets.forEach(b => {
+    enemies.forEach(e => {
+      if (e.hp !== 0 && overlap({ x: b.x, y: b.y, w: 4 * dpr, h: 4 * dpr }, e)) {
+        e.hp = 0;
+        b.x = -9999;
+        score += e.value;
+      }
+    });
+  });
+
+  enemies = enemies.filter(e => e.hp !== 0);
+  hud.textContent = `WASD moves, arrows fire only. Score ${score}.`;
 }
 
 function shoot(vx, vy){
   if (fireCooldown > 0) return;
   const speed = 520 * dpr;
-  bullets.push({
-    x: ship.x + ship.w * 0.5,
-    y: ship.y + ship.h * 0.5,
-    vx: vx * speed,
-    vy: vy * speed,
-  });
+  bullets.push({ x: ship.x + ship.w * 0.5, y: ship.y + ship.h * 0.5, vx: vx * speed, vy: vy * speed });
   fireCooldown = 0.14;
 }
 
@@ -137,6 +190,5 @@ resize();
 ship.x = W * 0.5 - ship.w * 0.5;
 ship.y = H * 0.65;
 const now = new Date();
-const stamp = now.toLocaleString('en-US', { timeZone: 'America/Chicago', hour12: true });
-footnote.textContent = `Synced ${stamp} CST`;
+footnote.textContent = `Synced ${now.toLocaleString('en-US', { timeZone: 'America/Chicago' })} CST`;
 requestAnimationFrame(loop);
