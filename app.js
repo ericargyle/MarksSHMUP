@@ -4,7 +4,8 @@ const hud = document.getElementById('hud');
 
 let dpr = 1, W = 0, H = 0;
 let started = false;
-let keys = {};
+let moveKeys = {};
+let fireKeys = {};
 let ship = { x: 0, y: 0, w: 44, h: 26, speed: 260 };
 let stars = [];
 let bullets = [];
@@ -85,10 +86,10 @@ function update(dt){
   fireCooldown = Math.max(0, fireCooldown - dt);
 
   let dx = 0, dy = 0;
-  if (keys.KeyA) dx -= 1;
-  if (keys.KeyD) dx += 1;
-  if (keys.KeyW) dy -= 1;
-  if (keys.KeyS) dy += 1;
+  if (moveKeys.KeyA) dx -= 1;
+  if (moveKeys.KeyD) dx += 1;
+  if (moveKeys.KeyW) dy -= 1;
+  if (moveKeys.KeyS) dy += 1;
 
   const len = Math.hypot(dx, dy) || 1;
   ship.x += (dx / len) * ship.speed * dpr * dt;
@@ -97,10 +98,10 @@ function update(dt){
   ship.x = clamp(ship.x, 8 * dpr, W - ship.w - 8 * dpr);
   ship.y = clamp(ship.y, 8 * dpr, H - ship.h - 8 * dpr);
 
-  if (keys.ArrowUp) shoot(0, -1);
-  if (keys.ArrowDown) shoot(0, 1);
-  if (keys.ArrowLeft) shoot(-1, 0);
-  if (keys.ArrowRight) shoot(1, 0);
+  if (fireKeys.ArrowUp) shoot(0, -1);
+  if (fireKeys.ArrowDown) shoot(0, 1);
+  if (fireKeys.ArrowLeft) shoot(-1, 0);
+  if (fireKeys.ArrowRight) shoot(1, 0);
 
   bullets.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; });
   bullets = bullets.filter(b => b.x > -20 && b.x < W + 20 && b.y > -20 && b.y < H + 20);
@@ -130,12 +131,20 @@ function loop(ts){
 c.addEventListener('pointerdown', () => { started = true; });
 window.addEventListener('keydown', e => {
   started = true;
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
-  keys[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+    e.preventDefault();
+    fireKeys[e.code] = true;
+  } else {
+    moveKeys[e.code] = true;
+  }
 });
 window.addEventListener('keyup', e => {
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
-  keys[e.code] = false;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+    e.preventDefault();
+    fireKeys[e.code] = false;
+  } else {
+    moveKeys[e.code] = false;
+  }
 });
 window.addEventListener('resize', resize);
 
