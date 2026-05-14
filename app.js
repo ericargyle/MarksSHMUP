@@ -196,9 +196,9 @@ function startGame(){
   score = 0;
 }
 
-c.addEventListener('pointerdown', () => { started = true; });
+c.addEventListener('pointerdown', () => { started = true; titleScreen.classList.add('hidden'); });
 startBtn.addEventListener('click', startGame);
-window.addEventListener('keydown', e => { started = true; keys[e.code] = true; });
+window.addEventListener('keydown', e => { started = true; titleScreen.classList.add('hidden'); keys[e.code] = true; });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('resize', resize);
 
