@@ -166,6 +166,7 @@ function update(dt){
 
   enemies = enemies.filter(e => e.value !== 0);
   hud.textContent = `WASD moves, arrows fire only. Score ${score}.`;
+  if (started && enemies.length < 5 && spawnCooldown > 0.4) spawnCooldown = 0.3;
 }
 
 function shoot(vx, vy){
@@ -192,13 +193,14 @@ function startGame(){
   bullets = [];
   enemies = [];
   fireCooldown = 0;
-  spawnCooldown = 0.6;
+  spawnCooldown = 0.1;
   score = 0;
+  for (let i = 0; i < 3; i++) spawnEnemy();
 }
 
-c.addEventListener('pointerdown', () => { started = true; titleScreen.classList.add('hidden'); });
+c.addEventListener('pointerdown', () => { if (!started) startGame(); });
 startBtn.addEventListener('click', startGame);
-window.addEventListener('keydown', e => { started = true; titleScreen.classList.add('hidden'); keys[e.code] = true; });
+window.addEventListener('keydown', e => { if (!started) startGame(); keys[e.code] = true; });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('resize', resize);
 
