@@ -20,7 +20,6 @@ function circle(x0,y0,r,c0){ x.fillStyle=c0; x.beginPath(); x.arc(x0,y0,r,0,Math
 function line(x1,y1,x2,y2,c0,w=3){ x.strokeStyle=c0; x.lineWidth=w; x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2); x.stroke(); }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function rand(a,b){ return Math.random()*(b-a)+a; }
-function hit(a,b){ return a.x<a.w+b.x && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
 function boxOverlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
 
 function buildTerrain(){
@@ -34,7 +33,7 @@ function reset(){
   statusEl.textContent = 'Touch ship and drag. Use BOMB / LASER.';
   updateHud();
 }
-function updateHud(){ statsEl.textContent = `Score ${Math.floor(score)} · Bombs ${bombs} · Level ${level}`; }
+function updateHud(){ statsEl.textContent = `Score ${Math.floor(score)} · Bombs ${bombs} · Level ${level}`; statusEl.textContent = running ? (boss ? 'Boss fight!' : 'Touch ship and drag. Use BOMB / LASER.') : 'You win! Tap to restart.'; }
 function makeEnemy(offscreen=false){
   const y = rand(d.h*0.14, d.h*0.84);
   const kind = Math.random() < 0.5 ? 'drone' : (Math.random() < 0.8 ? 'swoop' : 'turret');
@@ -174,6 +173,7 @@ function update(dt){
   if (boss && boxOverlap({x:player.x,y:player.y,w:player.w,h:player.h}, boss) && player.inv===0) { player.inv = 1.0; score = Math.max(0, score - 200); }
 
   enemies = enemies.filter(e => e.hp > 0 && e.x > -120);
+  if (enemies.length < 6 && !boss) enemies.push(makeEnemy());
   particles = particles.filter(p => p.life > 0);
   updateHud();
 }
@@ -197,6 +197,8 @@ canvas.addEventListener('pointerdown', e => {
   if (!running) return startGame();
   const mx = e.clientX * d.s, my = e.clientY * d.s;
   if (pointInPlayer(mx,my)) { player.dragging = true; player.dragDX = mx - player.x; player.dragDY = my - player.y; }
+  else if (mx < d.w * 0.33) keys.KeyA = true;
+  else if (mx > d.w * 0.67) keys.KeyD = true;
 });
 canvas.addEventListener('pointermove', e => {
   if (!player.dragging) return;
@@ -204,8 +206,8 @@ canvas.addEventListener('pointermove', e => {
   player.x = clamp(mx - player.dragDX, sx(14), d.w*0.42);
   player.y = clamp(my - player.dragDY, sy(30), d.h - sy(44));
 });
-canvas.addEventListener('pointerup', () => { player.dragging = false; });
-canvas.addEventListener('pointercancel', () => { player.dragging = false; });
+canvas.addEventListener('pointerup', () => { player.dragging = false; keys.KeyA=false; keys.KeyD=false; });
+canvas.addEventListener('pointercancel', () => { player.dragging = false; keys.KeyA=false; keys.KeyD=false; });
 
 bombBtn.addEventListener('click', bomb);
 laserBtn.addEventListener('click', fireLaser);
